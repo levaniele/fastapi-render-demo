@@ -1,10 +1,18 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="FastAPI Render Demo")
+app = FastAPI()
 
-@app.get("/")
-def root():
-    return {"ok": True, "service": "fastapi-render-demo"}
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://verceldev-seven.vercel.app",
+        "http://localhost:3000",
+    ],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/health")
 def health():
