@@ -1,44 +1,53 @@
+import os
+import psycopg2
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI()
+app = FastAPI(title="Badminton360 API")
 
+# --- CORS (keep your Vercel domain here) ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://verceldev-seven.vercel.app",
         "http://localhost:3000",
     ],
-    allow_origin_regex=r"https://.*\.vercel\.app",
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-import asyncio
-import logging
-from db import test_connection
+def _get_db_url() -> str:
+    db_url = os.getenv("DATABASE_URL", "").strip()
+    return db_url
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-logger = logging.getLogger("fastapi_app")
+def _connect():
+    db_url = _get_db_url()
+    if not db_url:
+        raise RuntimeError("DATABASE_URL is not set")
 
-@app.on_event("startup")
-async def startup_event():
-    logger.info("FastAPI startup: checking DB connection")
-    ok, msg = await asyncio.to_thread(test_connection)
-    if ok:
-        logger.info("DB connection OK")
-    else:
-        logger.error("DB connection failed on startup: %s", msg)
+    # Neon typically needs SSL. If your URL already has sslmode=require, this is fine.
+    # If it doesn't, we enforce it.
+    if "sslmode=" not in db_url:
+        sep = "&" if "?" in db_url else "?"
+        db_url = f"{db_url}{sep}sslmode=require"
+
+    return psycopg2.connect(db_url)
 
 @app.get("/health")
 def health():
-    logger.info("Health endpoint requested; returning healthy")
-    return {"status": "healthy"}
+    return {"ok": True, "service": "badminton360", "db": "not_checked"}
 
-@app.get("/db-health")
-async def db_health():
-    ok, msg = await asyncio.to_thread(test_connection)
-    status = "healthy" if ok else "unhealthy"
-    logger.info("DB health check requested; status=%s detail=%s", status, msg)
-    return {"status": status, "detail": msg}
+@app.get("/db/health")
+def db_health():
+    try:
+        conn = _connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1;")
+                val = cur.fetchone()[0]
+            return {"ok": True, "db": "connected", "select_1": val}
+        finally:
+            conn.close()
+    except Exception as e:
+        return {"ok": False, "db": "error", "error": str(e)}
