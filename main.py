@@ -60,6 +60,10 @@ def _create_pool() -> pool.SimpleConnectionPool:
         maxconn=5,
         dsn=db_url,
         connect_timeout=5,
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10,
+        keepalives_count=5,
     )
 
 
@@ -88,13 +92,6 @@ def _connect():
 def _release_conn(conn) -> None:
     if _db_pool is not None:
         _db_pool.putconn(conn)
-
-
-@app.on_event("startup")
-def _startup() -> None:
-    global _db_pool
-    if _db_pool is None:
-        _db_pool = _create_pool()
 
 
 @app.on_event("shutdown")
