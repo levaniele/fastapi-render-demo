@@ -7,3 +7,4 @@ PyJWT
 bcrypt<4
 python-dotenv
 SQLAlchemy
+email-validator
