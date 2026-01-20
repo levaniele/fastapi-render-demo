@@ -8,6 +8,7 @@ import psycopg2
 from psycopg2 import pool
 
 from settings import get_settings
+from auth_routes import router as auth_router
 
 settings = get_settings()
 
@@ -17,7 +18,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("app")
 
-docs_enabled = settings.docs_enabled and not settings.is_production
+docs_enabled = settings.docs_enabled and (
+    not settings.is_production or settings.docs_in_production
+)
 
 app = FastAPI(
     title="Badminton360 API",
@@ -34,11 +37,12 @@ allowed_origins = settings.parsed_origins()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 _db_pool: Optional[pool.SimpleConnectionPool] = None
 
 

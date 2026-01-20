@@ -25,3 +25,4 @@ Set these environment variables in Render:
 - `ALLOWED_ORIGINS=https://your-vercel-domain`
 - `LOG_LEVEL=INFO`
 - `DOCS_ENABLED=false`
+- `DOCS_IN_PRODUCTION=false`
