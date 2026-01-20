@@ -5,3 +5,5 @@ pydantic-settings
 passlib[bcrypt]
 PyJWT
 bcrypt<4
+python-dotenv
+SQLAlchemy
