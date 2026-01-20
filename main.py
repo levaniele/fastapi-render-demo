@@ -1,11 +1,22 @@
 import os
 import psycopg2
+from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
-app = FastAPI(title="Badminton360 API")
+app = FastAPI(
+    title="Badminton360 API",
+    description="API for Badminton360. Health and DB checks + sample endpoints.",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    swagger_ui_parameters={"defaultModelsExpandDepth": -1},
+)
 
 # --- CORS (keep your Vercel domain here) ---
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -51,3 +62,16 @@ def db_health():
             conn.close()
     except Exception as e:
         return {"ok": False, "db": "error", "error": str(e)}
+
+
+class Item(BaseModel):
+    name: str
+    description: Optional[str] = None
+    price: float
+
+@app.post("/items", tags=["items"])
+def create_item(item: Item):
+    """
+    Create an item — this is a sample endpoint to show models in Swagger UI.
+    """
+    return {"ok": True, "item": item.dict()}
