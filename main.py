@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import psycopg2
 from psycopg2 import pool
 
 from settings import get_settings
@@ -62,11 +63,26 @@ def _create_pool() -> pool.SimpleConnectionPool:
     )
 
 
+def _reset_pool() -> None:
+    global _db_pool
+    if _db_pool is not None:
+        _db_pool.closeall()
+    _db_pool = _create_pool()
+
+
 def _connect():
     global _db_pool
     if _db_pool is None:
         _db_pool = _create_pool()
-    return _db_pool.getconn()
+    try:
+        conn = _db_pool.getconn()
+        if conn.closed != 0:
+            _db_pool.putconn(conn, close=True)
+            conn = _db_pool.getconn()
+        return conn
+    except Exception:
+        _reset_pool()
+        return _db_pool.getconn()
 
 
 def _release_conn(conn) -> None:
@@ -96,20 +112,28 @@ def health():
 
 @app.get("/db/health")
 def db_health():
-    try:
-        conn = _connect()
+    for attempt in range(2):
         try:
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1;")
-                val = cur.fetchone()[0]
-            return {"ok": True, "db": "connected", "select_1": val}
-        finally:
-            _release_conn(conn)
-    except Exception as e:
-        logger.exception("DB health check failed")
-        if settings.is_production:
-            return {"ok": False, "db": "error"}
-        return {"ok": False, "db": "error", "error": str(e)}
+            conn = _connect()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1;")
+                    val = cur.fetchone()[0]
+                return {"ok": True, "db": "connected", "select_1": val}
+            finally:
+                _release_conn(conn)
+        except psycopg2.OperationalError:
+            logger.warning("DB health check failed, resetting pool", exc_info=True)
+            _reset_pool()
+        except Exception as e:
+            logger.exception("DB health check failed")
+            if settings.is_production:
+                return {"ok": False, "db": "error"}
+            return {"ok": False, "db": "error", "error": str(e)}
+
+    if settings.is_production:
+        return {"ok": False, "db": "error"}
+    return {"ok": False, "db": "error", "error": "DB connection failed after retry"}
 
 
 class Item(BaseModel):
