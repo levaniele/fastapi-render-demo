@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     access_token_expire_hours: int = Field(
         default=24, alias="ACCESS_TOKEN_EXPIRE_HOURS"
     )
+    reset_token_expire_minutes: int = Field(
+        default=30, alias="RESET_TOKEN_EXPIRE_MINUTES"
+    )
     allowed_origins: str = Field(
         default="http://localhost:3000,http://127.0.0.1:3000",
         alias="ALLOWED_ORIGINS",

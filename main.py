@@ -8,7 +8,16 @@ import psycopg2
 from psycopg2 import pool
 
 from settings import get_settings
-from auth_routes import router as auth_router
+from app.routes import (
+    auth,
+    clubs,
+    players,
+    tournaments,
+    coaches,
+    officials,
+    rankings,
+    matches,
+)
 
 settings = get_settings()
 
@@ -42,7 +51,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth_router)
+app.include_router(auth.router)
+app.include_router(tournaments.router)
+app.include_router(players.router)
+app.include_router(clubs.router)
+app.include_router(coaches.router)
+app.include_router(officials.router)
+app.include_router(matches.router)
+app.include_router(rankings.router)
+
 _db_pool: Optional[pool.SimpleConnectionPool] = None
 
 
