@@ -3,6 +3,17 @@ Services for Match operations
 All database queries for matches-related endpoints
 """
 
+# ============================================================================
+# SUMMARY OF SERVICE (MATCHES):
+# ============================================================================
+# get_match_tie_by_id(db, tie_id)              - Fetch match tie and individual matches
+# get_individual_match(db, match_id)           - Fetch single match details
+# get_matches_by_category(db, category, limit) - List matches by category
+# get_recent_matches(db, limit)               - Recent matches
+# get_player_match_stats(db, player_id)       - Player match statistics
+# get_head_to_head_stats(db, player1_id, player2_id) - Head-to-head stats
+# Used by: /matches endpoints
+
 import logging
 from psycopg2.extras import RealDictCursor
 

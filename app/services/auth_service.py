@@ -3,6 +3,15 @@ Services for Authentication operations
 All database queries for auth-related endpoints
 """
 
+# ============================================================================
+# SUMMARY OF SERVICE (AUTH):
+# ============================================================================
+# get_user_by_email(db, email)         - Fetch user by email
+# check_email_exists(db, email)        - Check if email exists
+# create_user(db, email, password_hash)- Create new user
+# update_user_password(db, email, pw)  - Update user password
+# Used by: /auth endpoints (login, register, password reset)
+
 import logging
 from psycopg2.extras import RealDictCursor
 

@@ -3,6 +3,13 @@
 # REFACTORED VERSION - Service layer integration
 # ============================================================================
 
+# ============================================================================
+# SUMMARY OF ENDPOINTS:
+# ============================================================================
+# GET  /clubs                     - List all clubs
+# GET  /clubs/{slug}              - Get club details by slug
+# GET  /clubs/{slug}/players      - List players for a club with rankings
+
 import logging
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List

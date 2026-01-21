@@ -3,6 +3,16 @@
 # REFACTORED VERSION - Service layer integration
 # ============================================================================
 
+# ============================================================================
+# SUMMARY OF ENDPOINTS:
+# ============================================================================
+# GET  /matches/ties/{tie_id}                 - Get match tie with individual matches
+# GET  /matches/individual/{match_id}         - Get individual match details
+# GET  /matches/category/{category}           - List matches by category
+# GET  /matches/recent                        - Get recent matches
+# GET  /matches/stats/player/{player_id}      - Player match stats
+# GET  /matches/stats/head-to-head            - Head-to-head statistics
+
 from fastapi import APIRouter, HTTPException, status, Depends
 import logging
 from app.database import get_db

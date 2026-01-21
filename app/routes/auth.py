@@ -4,6 +4,14 @@
 # Includes: Login, Logout, Verify, JWT with Roles
 # ============================================================================
 
+# ============================================================================
+# SUMMARY OF ENDPOINTS:
+# ============================================================================
+# POST /auth/login       - Login with email/password, get JWT cookie
+# POST /auth/logout      - Logout, delete JWT cookie
+# GET  /auth/verify      - Check if authenticated, return user info
+# POST /auth/register    - Register new user (optional)
+
 from fastapi import APIRouter, HTTPException, status, Response, Request, Depends
 from passlib.context import CryptContext
 from app.database import get_db
@@ -275,12 +283,3 @@ def reset_password(data: PasswordResetConfirm, db=Depends(get_db)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Password reset failed",
         )
-
-
-# ============================================================================
-# SUMMARY OF ENDPOINTS:
-# ============================================================================
-# POST /auth/login       - Login with email/password, get JWT cookie
-# POST /auth/logout      - Logout, delete JWT cookie
-# GET  /auth/verify      - Check if authenticated, return user info
-# POST /auth/register    - Register new user (optional)

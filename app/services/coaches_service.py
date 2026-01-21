@@ -3,6 +3,14 @@ Services for Coach operations
 All database queries for coach-related endpoints
 """
 
+# ============================================================================
+# SUMMARY OF SERVICE (COACHES):
+# ============================================================================
+# get_all_coaches(db)           - List coaches
+# get_coach_by_slug(db, slug)   - Get coach details by slug
+# get_coach_stats(db, slug)     - Get stats for coach (tournaments, assignments)
+# Used by: /coaches endpoints
+
 import logging
 from psycopg2.extras import RealDictCursor
 

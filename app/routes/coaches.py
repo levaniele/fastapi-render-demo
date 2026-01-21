@@ -3,6 +3,13 @@
 # REFACTORED VERSION - Service layer integration
 # ============================================================================
 
+# ============================================================================
+# SUMMARY OF ENDPOINTS:
+# ============================================================================
+# GET  /coaches                    - List all coaches
+# GET  /coaches/{slug}             - Get coach details by slug
+# GET  /coaches/{slug}/stats       - Get coach statistics
+
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List
 import logging

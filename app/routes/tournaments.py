@@ -3,6 +3,27 @@
 # REFACTORED VERSION - Service layer integration
 # ============================================================================
 
+# ============================================================================
+# SUMMARY OF ENDPOINTS:
+# ============================================================================
+# GET  /tournaments                                 - List tournaments
+# GET  /tournaments/search                          - Search tournaments
+# GET  /tournaments/winners                         - List tournament winners
+# POST /tournaments/winners                         - Create tournament winners
+# PUT  /tournaments/winners/{tournament_id}        - Update tournament winners
+# GET  /tournaments/{slug}                          - Tournament details
+# GET  /tournaments/{slug}/stats                    - Tournament statistics
+# GET  /tournaments/{slug}/matches                  - Tournament matches
+# GET  /tournaments/{slug}/standings                - Tournament standings
+# GET  /tournaments/{slug}/teams                    - Tournament teams/roster
+# GET  /tournaments/{slug}/players                  - Tournament players
+# GET  /tournaments/{slug}/staff                    - Tournament staff
+# GET  /tournaments/{slug}/matches/{match_id}/rallies - Match rallies
+# POST /admin/tournaments                           - Create a tournament (admin)
+# PUT  /tournaments/{tournament_id}                - Update a tournament
+# PATCH /tournaments/{tournament_id}               - Partial update
+# DELETE /tournaments/{tournament_id}              - Delete a tournament
+
 from typing import List, Optional
 import logging
 from fastapi import APIRouter, HTTPException, status, Depends, Response

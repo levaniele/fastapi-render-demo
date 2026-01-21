@@ -3,6 +3,14 @@ Services for Club operations
 All database queries for club-related endpoints
 """
 
+# ============================================================================
+# SUMMARY OF SERVICE (CLUBS):
+# ============================================================================
+# get_all_clubs(db)             - List all clubs
+# get_club_by_slug(db, slug)    - Get club details by slug
+# get_club_players(db, slug)    - Get players for a club with rankings
+# Used by: /clubs endpoints
+
 import logging
 from psycopg2.extras import RealDictCursor
 

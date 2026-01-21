@@ -3,6 +3,18 @@
 # Rankings API Endpoints
 # ============================================================================
 
+# ============================================================================
+# SUMMARY OF ENDPOINTS:
+# ============================================================================
+# GET  /rankings/global                        - Get global player rankings
+# GET  /rankings/category/{category}           - Rankings for a specific category
+# GET  /rankings/player/{player_slug}          - Get ranking for a specific player
+# GET  /rankings/player/{player_slug}/history  - Player ranking history
+# GET  /rankings/tournament/{tournament_slug}  - Rankings for a tournament
+# POST /rankings/calculate/{tournament_id}     - Calculate rankings for a tournament
+# POST /rankings/recalculate/all               - Recalculate all rankings
+# GET  /rankings/top-players                   - Get top players across categories
+
 from typing import Optional
 import logging
 from psycopg2.extras import RealDictCursor

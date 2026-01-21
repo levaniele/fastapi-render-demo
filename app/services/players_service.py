@@ -1,7 +1,17 @@
+# ============================================================================
+# SUMMARY OF SERVICE (PLAYERS):
+# ============================================================================
+# get_player_count(conn)                 - Health check / player count
+# get_all_players_with_clubs(db)         - List players with aggregated rankings
+# get_players_by_gender(conn, gender)    - Filter players by gender
+# get_player_by_slug(conn, slug)         - Get player profile by slug
+# get_player_stats(conn, slug)           - Player stats (wins, participation)
+# Used by: /players endpoints
+
 from psycopg2.extras import RealDictCursor
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__) 
 
 
 def get_player_count(conn):

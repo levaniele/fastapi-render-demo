@@ -3,6 +3,16 @@ Services for Officials operations
 All database queries for umpires and referees endpoints
 """
 
+# ============================================================================
+# SUMMARY OF SERVICE (OFFICIALS):
+# ============================================================================
+# get_all_umpires(db)               - List umpires
+# get_umpire_by_slug(db, slug)      - Get umpire details
+# get_umpire_stats_by_slug(db, slug)- Get umpire match history and stats
+# get_all_referees(db)              - List referees
+# get_referee_by_slug(db, slug)     - Get referee details
+# Used by: /officials endpoints
+
 import logging
 from psycopg2.extras import RealDictCursor
 

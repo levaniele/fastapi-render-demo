@@ -3,6 +3,16 @@
 # FINAL PRODUCTION VERSION
 # ============================================================================
 
+# ============================================================================
+# SUMMARY OF ENDPOINTS:
+# ============================================================================
+# GET  /players                              - List all players with club info
+# GET  /players/gender/{gender}              - Filter players by gender
+# GET  /players/{slug}                       - Get player profile by slug
+# GET  /players/{slug}/stats                 - Get player statistics
+# GET  /players/{slug}/tournament-history    - Player tournament history
+# GET  /players/{slug}/match-history         - Player match history
+
 from fastapi import APIRouter, HTTPException, Depends, status
 from typing import List
 import logging

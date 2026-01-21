@@ -3,6 +3,24 @@ Services for Tournament operations
 All database queries for tournament-related endpoints
 """
 
+# ============================================================================
+# SUMMARY OF SERVICE (TOURNAMENTS):
+# ============================================================================
+# get_all_tournaments(db)                      - List tournaments
+# search_tournaments(db, query)                - Search tournaments
+# get_tournament_by_slug(db, slug)             - Get tournament details
+# get_tournament_winners(db, slug)             - List winners
+# upsert_tournament_winners(db, ...)           - Create/update winners
+# get_tournament_stats(db, slug)               - Tournament statistics
+# get_tournament_matches(db, slug)             - Tournament matches
+# get_tournament_standings(db, slug)           - Tournament standings
+# get_tournament_teams(db, slug)               - Tournament teams/rosters
+# get_tournament_players(db, slug)             - Tournament players
+# get_tournament_staff(db, slug)               - Tournament staff
+# get_match_rallies(db, match_id)              - Match rallies
+# create_tournament / update_tournament / delete_tournament - Admin CRUD operations
+# Used by: /tournaments endpoints
+
 import logging
 from typing import Optional
 from psycopg2.extras import RealDictCursor

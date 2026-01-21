@@ -1,3 +1,12 @@
+# ============================================================================
+# SUMMARY OF ENDPOINTS:
+# ============================================================================
+# GET  /officials/umpires                  - List all umpires
+# GET  /officials/umpires/{slug}           - Get umpire details by slug
+# GET  /officials/umpires/{slug}/stats     - Get umpire statistics and match history
+# GET  /officials/referees                 - List all referees
+# GET  /officials/referees/{slug}          - Get referee details by slug
+
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List
 import logging

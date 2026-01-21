@@ -3,6 +3,13 @@
 # Ranking Calculation Service - Calculates and updates player rankings
 # ============================================================================
 
+# ============================================================================
+# SUMMARY OF SERVICE (RANKING_CALCULATOR):
+# ============================================================================
+# RankingCalculator.calculate_tournament_points(tournament_id) - Calculate & save tournament points
+# Internal helpers: _calculate_placement_points, _calculate_match_points, _calculate_set_points, _save_tournament_points, _update_global_rankings, _update_rank_positions
+# Used by: /rankings endpoints
+
 from typing import Dict, Optional
 import logging
 from psycopg2.extras import RealDictCursor

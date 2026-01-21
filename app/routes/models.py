@@ -1,3 +1,15 @@
+# ============================================================================
+# FILE: app/routes/models.py
+# ORM MODELS: Database table model definitions
+# ============================================================================
+
+# ============================================================================
+# SUMMARY OF MODELS:
+# ============================================================================
+# Tournament - ORM model for the 'tournaments' table
+#   Key fields: id, name, slug, start_date, end_date, timezone,
+#               organizer_organization_id, status, current_phase, last_completed_phase
+
 from sqlalchemy import (
     Column,
     Integer,
