@@ -89,13 +89,14 @@ def login(data: LoginRequest, response: Response, db: Session = Depends(get_db_s
             }
         )
 
-        # Set HTTP-only cookie (most secure)
+        # Set HTTP-only cookie (cross-origin compatible)
+        # For cross-origin cookies: secure=True + samesite="none" required
         response.set_cookie(
             key="access_token",
             value=access_token,
             httponly=True,
-            secure=False,  # Set to True in production with HTTPS
-            samesite="lax",
+            secure=settings.is_production,  # True for HTTPS in production
+            samesite="none" if settings.is_production else "lax",  # "none" for cross-origin
             max_age=86400 * settings.access_token_expire_hours // 24,
             path="/",
         )
@@ -132,9 +133,13 @@ def logout(response: Response):
     Logout user by deleting authentication cookie
     """
     try:
-        # Delete the access_token cookie
+        # Delete the access_token cookie (must match set_cookie settings)
         response.delete_cookie(
-            key="access_token", path="/", httponly=True, samesite="lax"
+            key="access_token",
+            path="/",
+            httponly=True,
+            secure=settings.is_production,
+            samesite="none" if settings.is_production else "lax",
         )
 
         return {"message": "Successfully logged out", "status": "success"}
