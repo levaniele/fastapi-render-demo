@@ -14,11 +14,12 @@
 
 from fastapi import APIRouter, HTTPException, status, Response, Request, Depends
 from passlib.context import CryptContext
-from app.database import get_db
+from sqlalchemy.orm import Session
+from app.database import get_db_session
 from app.schemas import LoginRequest, PasswordResetRequest, PasswordResetConfirm
-from settings import get_settings
+from app.core.config import get_settings
 from app.services import auth_service
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import jwt
 import logging
 
@@ -36,7 +37,7 @@ settings = get_settings()
 def create_access_token(data: dict):
     """Create JWT access token with expiration"""
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(hours=settings.access_token_expire_hours)
+    expire = datetime.now(timezone.utc) + timedelta(hours=settings.access_token_expire_hours)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(
         to_encode, settings.secret_key, algorithm=settings.algorithm
@@ -45,7 +46,7 @@ def create_access_token(data: dict):
 
 
 def create_password_reset_token(email: str) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=settings.reset_token_expire_minutes)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.reset_token_expire_minutes)
     payload = {"sub": email, "purpose": "password_reset", "exp": expire}
     return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
 
@@ -56,7 +57,7 @@ def create_password_reset_token(email: str) -> str:
 
 
 @router.post("/login")
-def login(data: LoginRequest, response: Response, db=Depends(get_db)):
+def login(data: LoginRequest, response: Response, db: Session = Depends(get_db_session)):
     """
     Authenticate user with email and password
     Returns JWT token with user role in HTTP-only cookie
@@ -190,7 +191,7 @@ def verify_token(request: Request):
 
 
 @router.post("/register")
-def register(data: LoginRequest, db=Depends(get_db)):
+def register(data: LoginRequest, db: Session = Depends(get_db_session)):
     """
     Register a new user account
     """
@@ -224,7 +225,7 @@ def register(data: LoginRequest, db=Depends(get_db)):
 
 
 @router.post("/password/forgot")
-def request_password_reset(data: PasswordResetRequest, db=Depends(get_db)):
+def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get_db_session)):
     """
     Request a password reset token.
     """
@@ -243,7 +244,7 @@ def request_password_reset(data: PasswordResetRequest, db=Depends(get_db)):
 
 
 @router.post("/password/reset")
-def reset_password(data: PasswordResetConfirm, db=Depends(get_db)):
+def reset_password(data: PasswordResetConfirm, db: Session = Depends(get_db_session)):
     """
     Reset password using a short-lived token.
     """

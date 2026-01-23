@@ -16,8 +16,9 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from typing import List
 import logging
+from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import get_db_session
 from app.schemas import PlayerWithClub
 from app.services import players_service
 
@@ -29,7 +30,7 @@ router = APIRouter(prefix="/players", tags=["Players"])
 
 
 @router.get("/", response_model=List[PlayerWithClub])
-def get_all_players(db=Depends(get_db)):
+def get_all_players(db: Session = Depends(get_db_session)):
     """
     Fetches the full player registry.
     Returns players with an array of category rankings (WS, WD, etc.).
@@ -52,7 +53,7 @@ def get_all_players(db=Depends(get_db)):
 
 
 @router.get("/gender/{gender}", response_model=List[PlayerWithClub])
-def get_by_gender(gender: str, db=Depends(get_db)):
+def get_by_gender(gender: str, db: Session = Depends(get_db_session)):
     """Filter players by Male or Female."""
     if gender not in ["Male", "Female"]:
         raise HTTPException(
@@ -67,7 +68,7 @@ def get_by_gender(gender: str, db=Depends(get_db)):
 
 
 @router.get("/{slug}", response_model=PlayerWithClub)
-def get_player(slug: str, db=Depends(get_db)):
+def get_player(slug: str, db: Session = Depends(get_db_session)):
     """
     Fetch specific player profile.
     Used for the http://localhost:3000/en/players/[slug] page.
@@ -88,7 +89,7 @@ def get_player(slug: str, db=Depends(get_db)):
 
 
 @router.get("/{slug}/stats")
-def get_stats(slug: str, db=Depends(get_db)):
+def get_stats(slug: str, db: Session = Depends(get_db_session)):
     """Get calculated win/loss record for the profile view."""
     try:
         stats = players_service.get_player_stats(db, slug)
@@ -101,7 +102,7 @@ def get_stats(slug: str, db=Depends(get_db)):
 
 
 @router.get("/{slug}/tournament-history")
-def get_tournaments(slug: str, db=Depends(get_db)):
+def get_tournaments(slug: str, db: Session = Depends(get_db_session)):
     """Get history of tournament placements for the profile view."""
     try:
         return players_service.get_tournament_history(db, slug)
@@ -111,7 +112,7 @@ def get_tournaments(slug: str, db=Depends(get_db)):
 
 
 @router.get("/{slug}/match-history")
-def get_matches(slug: str, db=Depends(get_db)):
+def get_matches(slug: str, db: Session = Depends(get_db_session)):
     """Get the last 10 individual matches for the profile view."""
     try:
         return players_service.get_player_match_history(db, slug)

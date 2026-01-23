@@ -1,8 +1,6 @@
 import os
 from pathlib import Path
 
-import psycopg2
-from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
@@ -12,25 +10,22 @@ ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(dotenv_path=ENV_PATH)
 
 # =============================================================================
-# Raw psycopg2 connection (used by existing service functions)
+# Compatibility helper: return raw DB-API connection from SQLAlchemy engine
+# Prefer using `get_db_session()` (SQLAlchemy Session) in new code.
 # =============================================================================
-
 
 def get_db():
-    database_url = os.getenv("DATABASE_URL")
-    if database_url:
-        return psycopg2.connect(database_url, cursor_factory=RealDictCursor)
-    return psycopg2.connect(
-        dbname=os.getenv("DB_NAME"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD"),
-        host=os.getenv("DB_HOST"),
-        port=os.getenv("DB_PORT"),
-        cursor_factory=RealDictCursor,
-    )
+    """Return a raw DB-API connection (compatibility).
+    
+    DEPRECATED: This function is deprecated and will be removed.
+    Use SQLAlchemy Session via `get_db_session()` instead.
+    """
+    import warnings
+    warnings.warn("get_db() is deprecated. Use get_db_session() instead.", DeprecationWarning, stacklevel=2)
+    return engine.raw_connection()
 
 # =============================================================================
-# SQLAlchemy setup (used by new ORM-based services)
+# SQLAlchemy setup (used by ORM-based services)
 # =============================================================================
 
 DATABASE_URL = os.getenv("DATABASE_URL")

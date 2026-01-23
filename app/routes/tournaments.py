@@ -26,9 +26,9 @@
 
 from typing import List, Optional
 import logging
-from fastapi import APIRouter, HTTPException, status, Depends, Response
+from fastapi import APIRouter, HTTPException, status, Depends, Response, Body
 from sqlalchemy.orm import Session
-from app.database import get_db, get_db_session
+from app.database import get_db_session
 from app.schemas import (
     TournamentResponse,
     TournamentList,
@@ -42,7 +42,8 @@ from app.schemas import (
 )
 from app.services import tournaments_service
 from app.services.tournaments_service import TournamentService
-from app.routes.models import Tournament
+from app.models import Tournament
+from app.core.dependencies import require_role
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tournaments", tags=["Tournaments"])
@@ -54,7 +55,7 @@ router = APIRouter(prefix="/tournaments", tags=["Tournaments"])
 
 
 @router.get("", response_model=List[TournamentList])
-def get_all_tournaments(db=Depends(get_db)):
+def get_all_tournaments(db: Session = Depends(get_db_session)):
     """Fetch all tournaments with metadata for UI cards."""
     try:
         tournaments = tournaments_service.get_all_tournaments(db)
@@ -69,7 +70,7 @@ def get_all_tournaments(db=Depends(get_db)):
 
 
 @router.get("/search")
-def search_tournaments(query: str, db=Depends(get_db)):
+def search_tournaments(query: str, db: Session = Depends(get_db_session)):
     """Search tournaments by name or location."""
     try:
         results = tournaments_service.search_tournaments(db, query)
@@ -83,7 +84,7 @@ def search_tournaments(query: str, db=Depends(get_db)):
 
 
 @router.get("/winners", response_model=List[TournamentWinnersResponse])
-def get_tournament_winners(slug: Optional[str] = None, db=Depends(get_db)):
+def get_tournament_winners(slug: Optional[str] = None, db: Session = Depends(get_db_session)):
     """Fetch tournament winners (clubs and/or players)."""
     try:
         winners = tournaments_service.get_tournament_winners(db, slug)
@@ -99,7 +100,7 @@ def get_tournament_winners(slug: Optional[str] = None, db=Depends(get_db)):
 
 @router.post("/winners", response_model=TournamentWinnersResponse)
 def create_tournament_winners(
-    payload: TournamentWinnersCreate, db=Depends(get_db)
+    payload: TournamentWinnersCreate, db: Session = Depends(get_db_session)
 ):
     """Create winners for a tournament (upsert)."""
     try:
@@ -125,7 +126,7 @@ def create_tournament_winners(
 
 @router.put("/winners/{tournament_id}", response_model=TournamentWinnersResponse)
 def update_tournament_winners(
-    tournament_id: int, payload: TournamentWinnersUpdate, db=Depends(get_db)
+    tournament_id: int, payload: TournamentWinnersUpdate, db: Session = Depends(get_db_session)
 ):
     """Update winners for a tournament (upsert)."""
     try:
@@ -155,7 +156,7 @@ def update_tournament_winners(
 
 
 @router.get("/{slug}", response_model=TournamentResponse)
-def get_tournament_by_slug(slug: str, db=Depends(get_db)):
+def get_tournament_by_slug(slug: str, db: Session = Depends(get_db_session)):
     """Fetch basic tournament information by slug."""
     try:
         tournament = tournaments_service.get_tournament_by_slug(db, slug)
@@ -179,7 +180,7 @@ def get_tournament_by_slug(slug: str, db=Depends(get_db)):
 
 
 @router.get("/{slug}/stats", response_model=TournamentStats)
-def get_tournament_stats(slug: str, db=Depends(get_db)):
+def get_tournament_stats(slug: str, db: Session = Depends(get_db_session)):
     """Fetch comprehensive tournament statistics."""
     try:
         stats = tournaments_service.get_tournament_stats(db, slug)
@@ -208,7 +209,7 @@ def get_tournament_stats(slug: str, db=Depends(get_db)):
 
 
 @router.get("/{slug}/matches")
-def get_tournament_matches(slug: str, db=Depends(get_db)):
+def get_tournament_matches(slug: str, db: Session = Depends(get_db_session)):
     """Fetch all match ties for a tournament with individual match details."""
     try:
         matches = tournaments_service.get_tournament_matches(db, slug)
@@ -238,7 +239,7 @@ def get_tournament_matches(slug: str, db=Depends(get_db)):
 
 @router.get("/{slug}/standings")
 def get_tournament_standings(
-    slug: str, group_name: Optional[str] = None, db=Depends(get_db)
+    slug: str, group_name: Optional[str] = None, db: Session = Depends(get_db_session)
 ):
     """
     Calculate tournament standings with head-to-head records.
@@ -271,7 +272,7 @@ def get_tournament_standings(
 
 
 @router.get("/{slug}/teams", response_model=List[TeamRoster])
-def get_tournament_teams(slug: str, db=Depends(get_db)):
+def get_tournament_teams(slug: str, db: Session = Depends(get_db_session)):
     """
     Fetch team rosters showing which players each club registered.
     Uses tournament_lineups table.
@@ -294,7 +295,7 @@ def get_tournament_teams(slug: str, db=Depends(get_db)):
 
 
 @router.get("/{slug}/players")
-def get_tournament_players(slug: str, db=Depends(get_db)):
+def get_tournament_players(slug: str, db: Session = Depends(get_db_session)):
     """Fetch all players participating in a tournament WITH their categories."""
     try:
         players = tournaments_service.get_tournament_players(db, slug)
@@ -309,7 +310,7 @@ def get_tournament_players(slug: str, db=Depends(get_db)):
 
 
 @router.get("/{slug}/staff")
-def get_tournament_staff(slug: str, db=Depends(get_db)):
+def get_tournament_staff(slug: str, db: Session = Depends(get_db_session)):
     """
     Fetch all staff (coaches and umpires) assigned to a tournament.
     Uses tournament_coaches and tournament_umpires tables.
@@ -336,7 +337,7 @@ def get_tournament_staff(slug: str, db=Depends(get_db)):
 
 
 @router.get("/{slug}/matches/{match_id}/rallies")
-def get_match_rallies(slug: str, match_id: int, db=Depends(get_db)):
+def get_match_rallies(slug: str, match_id: int, db: Session = Depends(get_db_session)):
     """
     Fetch rallies for a match.
     Matches URL: /tournaments/{slug}/matches/{match_id}/rallies
@@ -365,9 +366,10 @@ def get_match_rallies(slug: str, match_id: int, db=Depends(get_db)):
     status_code=status.HTTP_201_CREATED,
 )
 def create_tournament(
-    tournament_data: TournamentCreate,
     response: Response,
+    tournament_data: TournamentCreate = Body(...),
     db: Session = Depends(get_db_session),
+    current_user: dict = Depends(require_role("admin")),
 ):
     """Create a new tournament. If a tournament with the same slug exists,
     perform an update instead of returning a conflict.
@@ -414,6 +416,7 @@ def update_tournament(
     tournament_id: int,
     tournament_data: TournamentUpdate,
     db: Session = Depends(get_db_session),
+    current_user: dict = Depends(require_role("admin")),
 ):
     """Update an existing tournament."""
     try:
@@ -446,6 +449,7 @@ def patch_tournament(
     tournament_id: int,
     tournament_data: TournamentUpdate,
     db: Session = Depends(get_db_session),
+    current_user: dict = Depends(require_role("admin")),
 ):
     """Patch an existing tournament (partial update)."""
     try:
@@ -474,7 +478,11 @@ def patch_tournament(
 
 
 @router.delete("/{tournament_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_tournament(tournament_id: int, db: Session = Depends(get_db_session)):
+def delete_tournament(
+    tournament_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: dict = Depends(require_role("admin")),
+):
     """Delete a tournament."""
     try:
         deleted = TournamentService.delete_tournament(

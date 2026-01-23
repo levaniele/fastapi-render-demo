@@ -7,7 +7,9 @@
       "Bash(python -m pytest:*)",
       "Bash(python -m mypy:*)",
       "Bash(pip install:*)",
-      "Bash(pip show:*)"
+      "Bash(pip show:*)",
+      "Bash(python:*)",
+      "Bash(python -c:*)"
     ]
   }
 }

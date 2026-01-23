@@ -12,103 +12,102 @@ All database queries for coach-related endpoints
 # Used by: /coaches endpoints
 
 import logging
-from psycopg2.extras import RealDictCursor
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
 
-def get_all_coaches(db):
+def get_all_coaches(db: Session):
     """
     Fetch all coaches for dashboard navbar dropdown.
     Returns: List[CoachList] - id, first_name, last_name, image_url, slug
     """
-    cur = db.cursor(cursor_factory=RealDictCursor)
-
     try:
-        cur.execute("""
-            SELECT 
-                id,
-                first_name, 
-                last_name, 
-                image_url,
-                slug
-            FROM coaches 
-            WHERE deleted_at IS NULL
-            ORDER BY last_name ASC, first_name ASC
-        """)
+        res = db.execute(
+            text(
+                """
+                SELECT 
+                    id,
+                    first_name, 
+                    last_name, 
+                    image_url,
+                    slug
+                FROM coaches 
+                WHERE deleted_at IS NULL
+                ORDER BY last_name ASC, first_name ASC
+                """
+            )
+        )
 
-        coaches = cur.fetchall()
+        coaches = [dict(r) for r in res.mappings().all()]
         return coaches if coaches else []
 
     except Exception as e:
         logger.error(f"Error fetching coaches: {e}")
         raise
-    finally:
-        cur.close()
 
 
-def get_coach_by_slug(db, slug: str):
+def get_coach_by_slug(db: Session, slug: str):
     """
     Fetch detailed information for a specific coach by slug.
     Includes club information and certification details.
     Returns: CoachWithClub
     """
-    cur = db.cursor(cursor_factory=RealDictCursor)
-
     try:
-        cur.execute(
-            """
-            SELECT 
-                co.id,
-                co.first_name, 
-                co.last_name, 
-                co.certification_level,
-                co.certification_level_id,
-                co.club_id,
-                co.image_url,
-                co.slug,
-                co.created_at,
-                c.name as club_name,
-                c.logo_url as club_logo,
-                cl.level_name as certification_name
-            FROM coaches co
-            LEFT JOIN clubs c ON co.club_id = c.id
-            LEFT JOIN certification_levels cl ON co.certification_level_id = cl.id
-            WHERE LOWER(co.slug) = LOWER(%s)
-                AND co.deleted_at IS NULL
-        """,
-            (slug,),
+        r = db.execute(
+            text(
+                """
+                SELECT 
+                    co.id,
+                    co.first_name, 
+                    co.last_name, 
+                    co.certification_level,
+                    co.certification_level_id,
+                    co.club_id,
+                    co.image_url,
+                    co.slug,
+                    co.created_at,
+                    c.name as club_name,
+                    c.logo_url as club_logo,
+                    cl.level_name as certification_name
+                FROM coaches co
+                LEFT JOIN clubs c ON co.club_id = c.id
+                LEFT JOIN certification_levels cl ON co.certification_level_id = cl.id
+                WHERE LOWER(co.slug) = LOWER(:slug)
+                    AND co.deleted_at IS NULL
+                """
+            ),
+            {"slug": slug},
         )
 
-        coach = cur.fetchone()
-        return coach
+        coach = r.mappings().first()
+        return dict(coach) if coach else None
 
     except Exception as e:
         logger.error(f"Error fetching coach by slug: {e}")
         raise
-    finally:
-        cur.close()
 
 
-def get_coach_stats(db, slug: str):
+def get_coach_stats(db: Session, slug: str):
     """
     Fetch statistics for a coach including tournament participation.
     Returns: dict with tournament_count and recent_tournaments
     """
-    cur = db.cursor(cursor_factory=RealDictCursor)
-
     try:
         # Get coach ID
-        cur.execute(
-            """
-            SELECT id FROM coaches 
-            WHERE LOWER(slug) = LOWER(%s)
-                AND deleted_at IS NULL
-        """,
-            (slug,),
+        r = db.execute(
+            text(
+                """
+                SELECT id FROM coaches 
+                WHERE LOWER(slug) = LOWER(:slug)
+                    AND deleted_at IS NULL
+                """
+            ),
+            {"slug": slug},
         )
 
-        coach = cur.fetchone()
+        coach = r.mappings().first()
 
         if not coach:
             return None
@@ -116,36 +115,40 @@ def get_coach_stats(db, slug: str):
         coach_id = coach["id"]
 
         # Get tournament count
-        cur.execute(
-            """
-            SELECT COUNT(DISTINCT tournament_id) as tournament_count
-            FROM tournament_coaches
-            WHERE coach_id = %s
-        """,
-            (coach_id,),
+        r2 = db.execute(
+            text(
+                """
+                SELECT COUNT(DISTINCT tournament_id) as tournament_count
+                FROM tournament_coaches
+                WHERE coach_id = :coach_id
+                """
+            ),
+            {"coach_id": coach_id},
         )
 
-        stats = cur.fetchone()
+        stats = r2.mappings().first()
 
         # Get recent tournaments
-        cur.execute(
-            """
-            SELECT 
-                t.name,
-                t.slug,
-                t.start_date,
-                tc.assigned_role
-            FROM tournament_coaches tc
-            JOIN tournaments t ON tc.tournament_id = t.id
-            WHERE tc.coach_id = %s
-                AND t.deleted_at IS NULL
-            ORDER BY t.start_date DESC
-            LIMIT 5
-        """,
-            (coach_id,),
+        r3 = db.execute(
+            text(
+                """
+                SELECT 
+                    t.name,
+                    t.slug,
+                    t.start_date,
+                    tc.assigned_role
+                FROM tournament_coaches tc
+                JOIN tournaments t ON tc.tournament_id = t.id
+                WHERE tc.coach_id = :coach_id
+                    AND t.deleted_at IS NULL
+                ORDER BY t.start_date DESC
+                LIMIT 5
+                """
+            ),
+            {"coach_id": coach_id},
         )
 
-        tournaments = cur.fetchall()
+        tournaments = [dict(rr) for rr in r3.mappings().all()]
 
         return {
             "tournament_count": stats["tournament_count"],
@@ -155,5 +158,3 @@ def get_coach_stats(db, slug: str):
     except Exception as e:
         logger.error(f"Error fetching coach stats: {e}")
         raise
-    finally:
-        cur.close()

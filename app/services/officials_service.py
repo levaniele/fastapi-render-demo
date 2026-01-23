@@ -14,67 +14,63 @@ All database queries for umpires and referees endpoints
 # Used by: /officials endpoints
 
 import logging
-from psycopg2.extras import RealDictCursor
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
 
-def get_all_umpires(db):
+def get_all_umpires(db: Session):
     """
     Fetch all active umpires from the database.
     Returns: List[UmpireResponse]
     """
-    cur = db.cursor(cursor_factory=RealDictCursor)
-
     try:
-        cur.execute("""
-            SELECT 
-                id,
-                first_name, 
-                last_name, 
-                slug, 
-                image_url, 
-                certification_level,
-                nationality_code
-            FROM umpires
-            WHERE deleted_at IS NULL
-            ORDER BY last_name, first_name
-        """)
-
-        umpires = cur.fetchall()
+        r = db.execute(
+            text(
+                """
+                SELECT 
+                    id,
+                    first_name, 
+                    last_name, 
+                    slug, 
+                    image_url, 
+                    certification_level,
+                    nationality_code
+                FROM umpires
+                WHERE deleted_at IS NULL
+                ORDER BY last_name, first_name
+                """
+            )
+        )
+        umpires = [dict(row) for row in r.mappings().all()]
         return umpires if umpires else []
-
     except Exception as e:
         logger.error(f"Error fetching umpires: {e}")
         raise
-    finally:
-        cur.close()
 
 
-def get_umpire_by_slug(db, slug: str):
+def get_umpire_by_slug(db: Session, slug: str):
     """
     Fetch a single umpire profile by their unique slug.
     Returns: UmpireResponse
     """
-    cur = db.cursor(cursor_factory=RealDictCursor)
-
     try:
-        cur.execute(
-            """
-            SELECT * FROM umpires 
-            WHERE slug = %s AND deleted_at IS NULL
-        """,
-            (slug,),
+        r = db.execute(
+            text(
+                """
+                SELECT * FROM umpires 
+                WHERE slug = :slug AND deleted_at IS NULL
+                """
+            ),
+            {"slug": slug},
         )
 
-        umpire = cur.fetchone()
-        return umpire
-
+        umpire = r.mappings().first()
+        return dict(umpire) if umpire else None
     except Exception as e:
         logger.error(f"Error fetching umpire details: {e}")
         raise
-    finally:
-        cur.close()
 
 
 # ============================================================================
@@ -82,102 +78,105 @@ def get_umpire_by_slug(db, slug: str):
 # ============================================================================
 
 
-def get_umpire_stats_by_slug(db, slug: str):
-    cur = db.cursor(cursor_factory=RealDictCursor)
+def get_umpire_stats_by_slug(db: Session, slug: str):
     try:
         # 1. Fetch Umpire Basic Details
-        cur.execute(
-            """
-            SELECT 
-                id, first_name, last_name, slug, 
-                image_url, certification_level, nationality_code
-            FROM umpires 
-            WHERE slug = %s AND deleted_at IS NULL
-        """,
-            (slug,),
+        r = db.execute(
+            text(
+                """
+                SELECT 
+                    id, first_name, last_name, slug, 
+                    image_url, certification_level, nationality_code
+                FROM umpires 
+                WHERE slug = :slug AND deleted_at IS NULL
+                """
+            ),
+            {"slug": slug},
         )
-        umpire = cur.fetchone()
+        umpire = r.mappings().first()
 
         if not umpire:
             return None
 
         # 2. Fetch Matches (Handling Singles AND Doubles)
         # We use CASE statements and Subqueries to format names correctly based on match_type.
-        cur.execute(
-            """
-            SELECT 
-                m.id, 
-                m.tie_id, 
-                m.match_type, 
-                m.category, 
-                m.set_1_score, 
-                m.set_2_score, 
-                m.set_3_score, 
-                m.duration_minutes,
+        r2 = db.execute(
+            text(
+                """
+                SELECT 
+                    m.id, 
+                    m.tie_id, 
+                    m.match_type, 
+                    m.category, 
+                    m.set_1_score, 
+                    m.set_2_score, 
+                    m.set_3_score, 
+                    m.duration_minutes,
+                    
+                    -- PLAYER 1 NAME (Singles vs Doubles)
+                    CASE 
+                        WHEN m.match_type = 'singles' THEN CONCAT(p1.first_name, ' ', p1.last_name)
+                        ELSE (
+                            SELECT STRING_AGG(p.last_name, ' / ')
+                            FROM match_doubles_players mdp
+                            JOIN players p ON mdp.player_id = p.id
+                            WHERE mdp.match_id = m.id AND mdp.team_side = 1
+                        )
+                    END as player_1_name,
+
+                    -- PLAYER 2 NAME (Singles vs Doubles)
+                    CASE 
+                        WHEN m.match_type = 'singles' THEN CONCAT(p2.first_name, ' ', p2.last_name)
+                        ELSE (
+                            SELECT STRING_AGG(p.last_name, ' / ')
+                            FROM match_doubles_players mdp
+                            JOIN players p ON mdp.player_id = p.id
+                            WHERE mdp.match_id = m.id AND mdp.team_side = 2
+                        )
+                    END as player_2_name,
+
+                    -- WINNER NAME (Singles vs Doubles)
+                    CASE 
+                        WHEN m.winner_id IS NULL THEN NULL
+                        WHEN m.match_type = 'singles' THEN CONCAT(pw.first_name, ' ', pw.last_name)
+                        ELSE (
+                            -- For doubles, find the side that the winner_id belongs to, and show that pair
+                            SELECT STRING_AGG(p.last_name, ' / ')
+                            FROM match_doubles_players mdp_win
+                            JOIN players p ON mdp_win.player_id = p.id
+                            WHERE mdp_win.match_id = m.id 
+                              AND mdp_win.team_side = (
+                                  SELECT team_side FROM match_doubles_players 
+                                  WHERE match_id = m.id AND player_id = m.winner_id LIMIT 1
+                              )
+                        )
+                    END as winner_name,
+
+                    -- Tournament Info
+                    t.id as tournament_id,
+                    t.name as tournament_name,
+                    t.slug as tournament_slug,
+                    t.start_date as tournament_date,
+                    t.logo_url as tournament_logo
+
+                FROM individual_matches m
+                JOIN match_ties tie ON m.tie_id = tie.id
+                JOIN tournament_groups tg ON tie.group_id = tg.id 
+                JOIN tournaments t ON tg.tournament_id = t.id
                 
-                -- PLAYER 1 NAME (Singles vs Doubles)
-                CASE 
-                    WHEN m.match_type = 'singles' THEN CONCAT(p1.first_name, ' ', p1.last_name)
-                    ELSE (
-                        SELECT STRING_AGG(p.last_name, ' / ')
-                        FROM match_doubles_players mdp
-                        JOIN players p ON mdp.player_id = p.id
-                        WHERE mdp.match_id = m.id AND mdp.team_side = 1
-                    )
-                END as player_1_name,
-
-                -- PLAYER 2 NAME (Singles vs Doubles)
-                CASE 
-                    WHEN m.match_type = 'singles' THEN CONCAT(p2.first_name, ' ', p2.last_name)
-                    ELSE (
-                        SELECT STRING_AGG(p.last_name, ' / ')
-                        FROM match_doubles_players mdp
-                        JOIN players p ON mdp.player_id = p.id
-                        WHERE mdp.match_id = m.id AND mdp.team_side = 2
-                    )
-                END as player_2_name,
-
-                -- WINNER NAME (Singles vs Doubles)
-                CASE 
-                    WHEN m.winner_id IS NULL THEN NULL
-                    WHEN m.match_type = 'singles' THEN CONCAT(pw.first_name, ' ', pw.last_name)
-                    ELSE (
-                        -- For doubles, find the side that the winner_id belongs to, and show that pair
-                        SELECT STRING_AGG(p.last_name, ' / ')
-                        FROM match_doubles_players mdp_win
-                        JOIN players p ON mdp_win.player_id = p.id
-                        WHERE mdp_win.match_id = m.id 
-                          AND mdp_win.team_side = (
-                              SELECT team_side FROM match_doubles_players 
-                              WHERE match_id = m.id AND player_id = m.winner_id LIMIT 1
-                          )
-                    )
-                END as winner_name,
-
-                -- Tournament Info
-                t.id as tournament_id,
-                t.name as tournament_name,
-                t.slug as tournament_slug,
-                t.start_date as tournament_date,
-                t.logo_url as tournament_logo
-
-            FROM individual_matches m
-            JOIN match_ties tie ON m.tie_id = tie.id
-            JOIN tournament_groups tg ON tie.group_id = tg.id 
-            JOIN tournaments t ON tg.tournament_id = t.id
-            
-            -- Joins for Singles Players (Still useful for Singles matches)
-            LEFT JOIN players p1 ON m.player_1_id = p1.id
-            LEFT JOIN players p2 ON m.player_2_id = p2.id
-            LEFT JOIN players pw ON m.winner_id = pw.id
-            
-            WHERE m.umpire_id = %s
-            ORDER BY t.start_date DESC, m.id DESC
-        """,
-            (umpire["id"],),
+                -- Joins for Singles Players (Still useful for Singles matches)
+                LEFT JOIN players p1 ON m.player_1_id = p1.id
+                LEFT JOIN players p2 ON m.player_2_id = p2.id
+                LEFT JOIN players pw ON m.winner_id = pw.id
+                
+                WHERE m.umpire_id = :umpire_id
+                ORDER BY t.start_date DESC, m.id DESC
+                """
+            ),
+            {"umpire_id": umpire["id"]},
         )
 
-        raw_matches = cur.fetchall()
+        raw_matches = [dict(row) for row in r2.mappings().all()]
 
         # 3. Process Data
         matches_list = []
@@ -219,71 +218,68 @@ def get_umpire_stats_by_slug(db, slug: str):
                     }
                 )
 
+        umpire_dict = dict(umpire)
         return {
-            **umpire,
+            **umpire_dict,
             "total_matches": len(matches_list),
             "total_tournaments": len(tournaments_list),
             "matches": matches_list,
             "tournaments": tournaments_list,
         }
+    except Exception as e:
+        logger.error(f"Error fetching umpire stats for {slug}: {e}")
+        raise
 
-    finally:
-        cur.close()
 
-
-def get_all_referees(db):
+def get_all_referees(db: Session):
     """
     Fetch all active referees from the database.
     Returns: List[RefereeResponse]
     """
-    cur = db.cursor(cursor_factory=RealDictCursor)
-
     try:
-        cur.execute("""
-            SELECT 
-                id, 
-                first_name, 
-                last_name, 
-                slug, 
-                image_url, 
-                certification_level, 
-                nationality_code
-            FROM referees 
-            WHERE deleted_at IS NULL
-            ORDER BY last_name
-        """)
+        r = db.execute(
+            text(
+                """
+                SELECT 
+                    id, 
+                    first_name, 
+                    last_name, 
+                    slug, 
+                    image_url, 
+                    certification_level, 
+                    nationality_code
+                FROM referees 
+                WHERE deleted_at IS NULL
+                ORDER BY last_name
+                """
+            )
+        )
 
-        referees = cur.fetchall()
+        referees = [dict(row) for row in r.mappings().all()]
         return referees if referees else []
-
     except Exception as e:
         logger.error(f"Error fetching referees: {e}")
         raise
-    finally:
-        cur.close()
 
 
-def get_referee_by_slug(db, slug: str):
+def get_referee_by_slug(db: Session, slug: str):
     """
     Fetch a single referee profile by their unique slug.
     Returns: RefereeResponse
     """
-    cur = db.cursor(cursor_factory=RealDictCursor)
-
     try:
-        cur.execute(
-            """
-            SELECT * FROM referees 
-            WHERE slug = %s AND deleted_at IS NULL
-        """,
-            (slug,),
+        r = db.execute(
+            text(
+                """
+                SELECT * FROM referees 
+                WHERE slug = :slug AND deleted_at IS NULL
+                """
+            ),
+            {"slug": slug},
         )
 
-        referee = cur.fetchone()
-        return referee
-
+        referee = r.mappings().first()
+        return dict(referee) if referee else None
     except Exception as e:
         logger.error(f"Error fetching referee details: {e}")
         raise
-    finally:
-        cur.close()

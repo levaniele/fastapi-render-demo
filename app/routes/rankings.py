@@ -17,9 +17,10 @@
 
 from typing import Optional
 import logging
-from psycopg2.extras import RealDictCursor
-from fastapi import APIRouter, HTTPException, status, Query
-from app.database import get_db
+from fastapi import APIRouter, HTTPException, status, Query, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+from app.database import get_db_session
 from app.services.ranking_calculator import calculate_rankings_for_tournament
 
 logger = logging.getLogger(__name__)
@@ -37,104 +38,123 @@ def get_global_rankings(
         None, description="Filter by category: MS, WS, MD, WD, XD"
     ),
     limit: int = Query(50, ge=1, le=200, description="Number of players to return"),
+    db: Session = Depends(get_db_session),
 ):
     """
     Get global player rankings across all tournaments.
-
-    Query Parameters:
-    - category: Filter by specific category (MS, WS, MD, WD, XD). If null, returns all.
-    - limit: Number of top players to return (default: 50, max: 200)
-
-    Returns:
-    - List of players with ranking, points, and statistics
     """
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-
     try:
-        # Build query based on category filter
         if category:
-            category_filter = "WHERE pr.category = %s"
-            params = [category.upper(), limit]
+            query = text(
+                """
+                SELECT 
+                    pr.player_id,
+                    pr.category,
+                    pr.current_rank as rank,
+                    pr.previous_rank,
+                    pr.total_points as points,
+                    pr.tournament_points,
+                    pr.match_points,
+                    pr.set_points,
+                    pr.tournaments_played,
+                    pr.matches_won,
+                    pr.matches_lost,
+                    pr.sets_won,
+                    pr.sets_lost,
+                    pr.peak_rank,
+                    pr.peak_rank_date,
+                    CONCAT(p.first_name, ' ', p.last_name) as player_name,
+                    p.first_name,
+                    p.last_name,
+                    p.gender,
+                    p.image_url,
+                    p.slug,
+                    c.name as club_name,
+                    c.logo_url as club_logo,
+                    CASE 
+                        WHEN pr.previous_rank IS NULL THEN 'new'
+                        WHEN pr.current_rank < pr.previous_rank THEN 'up'
+                        WHEN pr.current_rank > pr.previous_rank THEN 'down'
+                        ELSE 'same'
+                    END as rank_change,
+                    CASE 
+                        WHEN (pr.matches_won + pr.matches_lost) > 0 
+                        THEN ROUND((pr.matches_won::DECIMAL / (pr.matches_won + pr.matches_lost) * 100), 1)
+                        ELSE 0
+                    END as win_percentage
+                FROM player_rankings pr
+                JOIN players p ON pr.player_id = p.id
+                LEFT JOIN clubs c ON p.club_id = c.id
+                WHERE pr.category = :category
+                ORDER BY pr.category, pr.current_rank
+                LIMIT :limit
+                """
+            )
+            params = {"category": category.upper(), "limit": limit}
         else:
-            category_filter = ""
-            params = [limit]
+            query = text(
+                """
+                SELECT 
+                    pr.player_id,
+                    pr.category,
+                    pr.current_rank as rank,
+                    pr.previous_rank,
+                    pr.total_points as points,
+                    pr.tournament_points,
+                    pr.match_points,
+                    pr.set_points,
+                    pr.tournaments_played,
+                    pr.matches_won,
+                    pr.matches_lost,
+                    pr.sets_won,
+                    pr.sets_lost,
+                    pr.peak_rank,
+                    pr.peak_rank_date,
+                    CONCAT(p.first_name, ' ', p.last_name) as player_name,
+                    p.first_name,
+                    p.last_name,
+                    p.gender,
+                    p.image_url,
+                    p.slug,
+                    c.name as club_name,
+                    c.logo_url as club_logo,
+                    CASE 
+                        WHEN pr.previous_rank IS NULL THEN 'new'
+                        WHEN pr.current_rank < pr.previous_rank THEN 'up'
+                        WHEN pr.current_rank > pr.previous_rank THEN 'down'
+                        ELSE 'same'
+                    END as rank_change,
+                    CASE 
+                        WHEN (pr.matches_won + pr.matches_lost) > 0 
+                        THEN ROUND((pr.matches_won::DECIMAL / (pr.matches_won + pr.matches_lost) * 100), 1)
+                        ELSE 0
+                    END as win_percentage
+                FROM player_rankings pr
+                JOIN players p ON pr.player_id = p.id
+                LEFT JOIN clubs c ON p.club_id = c.id
+                ORDER BY pr.category, pr.current_rank
+                LIMIT :limit
+                """
+            )
+            params = {"limit": limit}
 
-        query = f"""
-            SELECT 
-                pr.player_id,
-                pr.category,
-                pr.current_rank as rank,
-                pr.previous_rank,
-                pr.total_points as points,
-                pr.tournament_points,
-                pr.match_points,
-                pr.set_points,
-                pr.tournaments_played,
-                pr.matches_won,
-                pr.matches_lost,
-                pr.sets_won,
-                pr.sets_lost,
-                pr.peak_rank,
-                pr.peak_rank_date,
-                
-                -- Player info
-                CONCAT(p.first_name, ' ', p.last_name) as player_name,
-                p.first_name,
-                p.last_name,
-                p.gender,
-                p.image_url,
-                p.slug,
-                
-                -- Club info
-                c.name as club_name,
-                c.logo_url as club_logo,
-                
-                -- Calculate rank change
-                CASE 
-                    WHEN pr.previous_rank IS NULL THEN 'new'
-                    WHEN pr.current_rank < pr.previous_rank THEN 'up'
-                    WHEN pr.current_rank > pr.previous_rank THEN 'down'
-                    ELSE 'same'
-                END as rank_change,
-                
-                -- Win percentage
-                CASE 
-                    WHEN (pr.matches_won + pr.matches_lost) > 0 
-                    THEN ROUND((pr.matches_won::DECIMAL / (pr.matches_won + pr.matches_lost) * 100), 1)
-                    ELSE 0
-                END as win_percentage
-                
-            FROM player_rankings pr
-            JOIN players p ON pr.player_id = p.id
-            LEFT JOIN clubs c ON p.club_id = c.id
-            {category_filter}
-            ORDER BY pr.category, pr.current_rank
-            LIMIT %s
-        """
-
-        cur.execute(query, params)
-        rankings = cur.fetchall()
+        res = db.execute(query, params)
+        rankings = [dict(r) for r in res.mappings().all()]
 
         if not rankings:
             return {"rankings": [], "total": 0}
 
-        # Group by category if no filter
         if not category:
             grouped: dict[str, list[dict]] = {}
             for rank in rankings:
                 cat = rank["category"]
                 if cat not in grouped:
                     grouped[cat] = []
-                grouped[cat].append(dict(rank))
+                grouped[cat].append(rank)
 
             return {"rankings": grouped, "total": len(rankings)}
 
-        return {
-            "category": category.upper(),
-            "rankings": [dict(r) for r in rankings],
-            "total": len(rankings),
-        }
+        return {"category": category.upper(), "rankings": rankings, "total": len(rankings)}
 
     except Exception as e:
         logger.error(f"Error fetching global rankings: {e}")
@@ -142,20 +162,12 @@ def get_global_rankings(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch rankings",
         )
-    finally:
-        cur.close()
-        conn.close()
 
 
 @router.get("/category/{category}")
-def get_category_rankings(category: str, limit: int = Query(100, ge=1, le=200)):
+def get_category_rankings(category: str, limit: int = Query(100, ge=1, le=200), db: Session = Depends(get_db_session)):
     """
     Get rankings for a specific category.
-
-    Path Parameters:
-    - category: MS, WS, MD, WD, or XD
-
-    Returns detailed rankings for that category only.
     """
     valid_categories = ["MS", "WS", "MD", "WD", "XD"]
     category_upper = category.upper()
@@ -166,7 +178,7 @@ def get_category_rankings(category: str, limit: int = Query(100, ge=1, le=200)):
             detail=f"Invalid category. Must be one of: {', '.join(valid_categories)}",
         )
 
-    return get_global_rankings(category=category_upper, limit=limit)
+    return get_global_rankings(category=category_upper, limit=limit, db=db)
 
 
 # ============================================================================
@@ -175,70 +187,66 @@ def get_category_rankings(category: str, limit: int = Query(100, ge=1, le=200)):
 
 
 @router.get("/player/{player_slug}")
-def get_player_rankings(player_slug: str):
+def get_player_rankings(player_slug: str, db: Session = Depends(get_db_session)):
     """
     Get complete ranking information for a specific player across all categories.
     """
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-
     try:
-        # Get player ID
-        cur.execute(
-            """
-            SELECT id, first_name, last_name, image_url, slug
-            FROM players
-            WHERE LOWER(slug) = LOWER(%s)
-                AND deleted_at IS NULL
-        """,
-            (player_slug,),
+        r = db.execute(
+            text(
+                """
+                SELECT id, first_name, last_name, image_url, slug
+                FROM players
+                WHERE LOWER(slug) = LOWER(:slug)
+                    AND deleted_at IS NULL
+                """
+            ),
+            {"slug": player_slug},
         )
 
-        player = cur.fetchone()
+        player = r.mappings().first()
         if not player:
             raise HTTPException(status_code=404, detail="Player not found")
 
-        # Get rankings for all categories
-        cur.execute(
-            """
-            SELECT 
-                pr.category,
-                pr.current_rank,
-                pr.previous_rank,
-                pr.total_points,
-                pr.tournament_points,
-                pr.match_points,
-                pr.set_points,
-                pr.tournaments_played,
-                pr.matches_won,
-                pr.matches_lost,
-                pr.sets_won,
-                pr.sets_lost,
-                pr.peak_rank,
-                pr.peak_rank_date,
-                pr.last_updated,
-                
-                CASE 
-                    WHEN pr.previous_rank IS NULL THEN 'new'
-                    WHEN pr.current_rank < pr.previous_rank THEN 'up'
-                    WHEN pr.current_rank > pr.previous_rank THEN 'down'
-                    ELSE 'same'
-                END as rank_change,
-                
-                CASE 
-                    WHEN (pr.matches_won + pr.matches_lost) > 0 
-                    THEN ROUND((pr.matches_won::DECIMAL / (pr.matches_won + pr.matches_lost) * 100), 1)
-                    ELSE 0
-                END as win_percentage
-                
-            FROM player_rankings pr
-            WHERE pr.player_id = %s
-            ORDER BY pr.category
-        """,
-            (player["id"],),
+        r2 = db.execute(
+            text(
+                """
+                SELECT 
+                    pr.category,
+                    pr.current_rank,
+                    pr.previous_rank,
+                    pr.total_points,
+                    pr.tournament_points,
+                    pr.match_points,
+                    pr.set_points,
+                    pr.tournaments_played,
+                    pr.matches_won,
+                    pr.matches_lost,
+                    pr.sets_won,
+                    pr.sets_lost,
+                    pr.peak_rank,
+                    pr.peak_rank_date,
+                    pr.last_updated,
+                    CASE 
+                        WHEN pr.previous_rank IS NULL THEN 'new'
+                        WHEN pr.current_rank < pr.previous_rank THEN 'up'
+                        WHEN pr.current_rank > pr.previous_rank THEN 'down'
+                        ELSE 'same'
+                    END as rank_change,
+                    CASE 
+                        WHEN (pr.matches_won + pr.matches_lost) > 0 
+                        THEN ROUND((pr.matches_won::DECIMAL / (pr.matches_won + pr.matches_lost) * 100), 1)
+                        ELSE 0
+                    END as win_percentage
+                FROM player_rankings pr
+                WHERE pr.player_id = :player_id
+                ORDER BY pr.category
+                """
+            ),
+            {"player_id": player["id"]},
         )
 
-        categories = cur.fetchall()
+        categories = [dict(r) for r in r2.mappings().all()]
 
         return {
             "player": {
@@ -249,7 +257,7 @@ def get_player_rankings(player_slug: str):
                 "image_url": player["image_url"],
                 "slug": player["slug"],
             },
-            "rankings": [dict(c) for c in categories] if categories else [],
+            "rankings": categories if categories else [],
         }
 
     except HTTPException:
@@ -260,9 +268,6 @@ def get_player_rankings(player_slug: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch player rankings",
         )
-    finally:
-        cur.close()
-        conn.close()
 
 
 @router.get("/player/{player_slug}/history")
@@ -270,64 +275,71 @@ def get_player_ranking_history(
     player_slug: str,
     category: Optional[str] = None,
     days: int = Query(90, ge=7, le=365, description="Number of days of history"),
+    db: Session = Depends(get_db_session),
 ):
     """
     Get ranking history for a player to show rank progression over time.
     """
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-
     try:
-        # Get player ID
-        cur.execute(
-            """
-            SELECT id FROM players
-            WHERE LOWER(slug) = LOWER(%s) AND deleted_at IS NULL
-        """,
-            (player_slug,),
+        r = db.execute(
+            text(
+                """
+                SELECT id FROM players
+                WHERE LOWER(slug) = LOWER(:slug) AND deleted_at IS NULL
+                """
+            ),
+            {"slug": player_slug},
         )
 
-        player = cur.fetchone()
+        player = r.mappings().first()
         if not player:
             raise HTTPException(status_code=404, detail="Player not found")
 
-        # Build query
         if category:
-            category_filter = "AND rh.category = %s"
-            params = [player["id"], days, category.upper()]
+            query = text(
+                """
+                SELECT 
+                    rh.category,
+                    rh.rank,
+                    rh.total_points,
+                    rh.recorded_at as date
+                FROM ranking_history rh
+                WHERE rh.player_id = :player_id
+                    AND rh.recorded_at >= CURRENT_DATE - INTERVAL :days || ' days'
+                    AND rh.category = :category
+                ORDER BY rh.recorded_at ASC, rh.category
+                """
+            )
+            params = {"player_id": player["id"], "days": days, "category": category.upper()}
         else:
-            category_filter = ""
-            params = [player["id"], days]
+            query = text(
+                """
+                SELECT 
+                    rh.category,
+                    rh.rank,
+                    rh.total_points,
+                    rh.recorded_at as date
+                FROM ranking_history rh
+                WHERE rh.player_id = :player_id
+                    AND rh.recorded_at >= CURRENT_DATE - INTERVAL :days || ' days'
+                ORDER BY rh.recorded_at ASC, rh.category
+                """
+            )
+            params = {"player_id": player["id"], "days": days}
 
-        query = f"""
-    SELECT 
-        rh.category,
-        rh.rank,
-        rh.total_points,
-        rh.recorded_at as date
-    FROM ranking_history rh
-    WHERE rh.player_id = %s
-        AND rh.recorded_at >= CURRENT_DATE - INTERVAL '{days} days'
-        {category_filter}
-    ORDER BY rh.recorded_at ASC, rh.category
-"""
+        r2 = db.execute(query, params)
+        history = [dict(rr) for rr in r2.mappings().all()]
 
-        cur.execute(query, params)
-        history = cur.fetchall()
-
-        # Group by category
         grouped: dict[str, list[dict]] = {}
         for record in history:
             cat = record["category"]
             if cat not in grouped:
                 grouped[cat] = []
-            grouped[cat].append(
-                {
-                    "date": str(record["date"]),
-                    "rank": record["rank"],
-                    "points": record["total_points"],
-                }
-            )
+            grouped[cat].append({
+                "date": str(record["date"]),
+                "rank": record["rank"],
+                "points": record["total_points"],
+            })
 
         return {"player_id": player["id"], "history": grouped, "days": days}
 
@@ -339,9 +351,6 @@ def get_player_ranking_history(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch ranking history",
         )
-    finally:
-        cur.close()
-        conn.close()
 
 
 # ============================================================================
@@ -350,81 +359,102 @@ def get_player_ranking_history(
 
 
 @router.get("/tournament/{tournament_slug}")
-def get_tournament_rankings(tournament_slug: str, category: Optional[str] = None):
+def get_tournament_rankings(tournament_slug: str, category: Optional[str] = None, db: Session = Depends(get_db_session)):
     """
     Get player rankings/leaderboard for a specific tournament.
     Shows how players performed in THIS tournament.
     """
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-
     try:
-        # Get tournament ID
-        cur.execute(
-            """
-            SELECT id, name FROM tournaments
-            WHERE LOWER(slug) = LOWER(%s) AND deleted_at IS NULL
-        """,
-            (tournament_slug,),
+        r = db.execute(
+            text(
+                """
+                SELECT id, name FROM tournaments
+                WHERE LOWER(slug) = LOWER(:slug) AND deleted_at IS NULL
+                """
+            ),
+            {"slug": tournament_slug},
         )
 
-        tournament = cur.fetchone()
+        tournament = r.mappings().first()
         if not tournament:
             raise HTTPException(status_code=404, detail="Tournament not found")
 
-        # Build query
         if category:
-            category_filter = "AND tpp.category = %s"
-            params = [tournament["id"], category.upper()]
+            query = text(
+                """
+                SELECT 
+                    tpp.player_id,
+                    tpp.category,
+                    tpp.total_points,
+                    tpp.placement_points,
+                    tpp.match_win_points,
+                    tpp.set_win_points,
+                    tpp.matches_played,
+                    tpp.matches_won,
+                    tpp.sets_won,
+                    tpp.sets_lost,
+                    tpp.final_placement,
+                    CONCAT(p.first_name, ' ', p.last_name) as player_name,
+                    p.first_name,
+                    p.last_name,
+                    p.image_url,
+                    p.slug,
+                    c.name as club_name,
+                    c.logo_url as club_logo,
+                    CASE 
+                        WHEN tpp.matches_played > 0 
+                        THEN ROUND((tpp.matches_won::DECIMAL / tpp.matches_played * 100), 1)
+                        ELSE 0
+                    END as win_percentage,
+                    RANK() OVER (PARTITION BY tpp.category ORDER BY tpp.total_points DESC) as tournament_rank
+                FROM tournament_player_points tpp
+                JOIN players p ON tpp.player_id = p.id
+                LEFT JOIN clubs c ON p.club_id = c.id
+                WHERE tpp.tournament_id = :t_id
+                    AND tpp.category = :category
+                ORDER BY tpp.category, tpp.total_points DESC
+                """
+            )
+            params = {"t_id": tournament["id"], "category": category.upper()}
         else:
-            category_filter = ""
-            params = [tournament["id"]]
+            query = text(
+                """
+                SELECT 
+                    tpp.player_id,
+                    tpp.category,
+                    tpp.total_points,
+                    tpp.placement_points,
+                    tpp.match_win_points,
+                    tpp.set_win_points,
+                    tpp.matches_played,
+                    tpp.matches_won,
+                    tpp.sets_won,
+                    tpp.sets_lost,
+                    tpp.final_placement,
+                    CONCAT(p.first_name, ' ', p.last_name) as player_name,
+                    p.first_name,
+                    p.last_name,
+                    p.image_url,
+                    p.slug,
+                    c.name as club_name,
+                    c.logo_url as club_logo,
+                    CASE 
+                        WHEN tpp.matches_played > 0 
+                        THEN ROUND((tpp.matches_won::DECIMAL / tpp.matches_played * 100), 1)
+                        ELSE 0
+                    END as win_percentage,
+                    RANK() OVER (PARTITION BY tpp.category ORDER BY tpp.total_points DESC) as tournament_rank
+                FROM tournament_player_points tpp
+                JOIN players p ON tpp.player_id = p.id
+                LEFT JOIN clubs c ON p.club_id = c.id
+                WHERE tpp.tournament_id = :t_id
+                ORDER BY tpp.category, tpp.total_points DESC
+                """
+            )
+            params = {"t_id": tournament["id"]}
 
-        query = f"""
-            SELECT 
-                tpp.player_id,
-                tpp.category,
-                tpp.total_points,
-                tpp.placement_points,
-                tpp.match_win_points,
-                tpp.set_win_points,
-                tpp.matches_played,
-                tpp.matches_won,
-                tpp.sets_won,
-                tpp.sets_lost,
-                tpp.final_placement,
-                
-                -- Player info
-                CONCAT(p.first_name, ' ', p.last_name) as player_name,
-                p.first_name,
-                p.last_name,
-                p.image_url,
-                p.slug,
-                
-                -- Club info
-                c.name as club_name,
-                c.logo_url as club_logo,
-                
-                -- Win percentage for this tournament
-                CASE 
-                    WHEN tpp.matches_played > 0 
-                    THEN ROUND((tpp.matches_won::DECIMAL / tpp.matches_played * 100), 1)
-                    ELSE 0
-                END as win_percentage,
-                
-                -- Rank within tournament
-                RANK() OVER (PARTITION BY tpp.category ORDER BY tpp.total_points DESC) as tournament_rank
-                
-            FROM tournament_player_points tpp
-            JOIN players p ON tpp.player_id = p.id
-            LEFT JOIN clubs c ON p.club_id = c.id
-            WHERE tpp.tournament_id = %s
-                {category_filter}
-            ORDER BY tpp.category, tpp.total_points DESC
-        """
-
-        cur.execute(query, params)
-        rankings = cur.fetchall()
+        res = db.execute(query, params)
+        rankings = [dict(r) for r in res.mappings().all()]
 
         if not rankings:
             return {
@@ -437,14 +467,13 @@ def get_tournament_rankings(tournament_slug: str, category: Optional[str] = None
                 "total": 0,
             }
 
-        # Group by category if no filter
         if not category:
             grouped: dict[str, list[dict]] = {}
             for rank in rankings:
                 cat = rank["category"]
                 if cat not in grouped:
                     grouped[cat] = []
-                grouped[cat].append(dict(rank))
+                grouped[cat].append(rank)
 
             return {
                 "tournament": {
@@ -463,7 +492,7 @@ def get_tournament_rankings(tournament_slug: str, category: Optional[str] = None
                 "slug": tournament_slug,
             },
             "category": category.upper(),
-            "rankings": [dict(r) for r in rankings],
+            "rankings": rankings,
             "total": len(rankings),
         }
 
@@ -475,9 +504,6 @@ def get_tournament_rankings(tournament_slug: str, category: Optional[str] = None
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch tournament rankings",
         )
-    finally:
-        cur.close()
-        conn.close()
 
 
 # ============================================================================
@@ -521,26 +547,26 @@ def calculate_tournament_rankings(tournament_id: int):
 
 
 @router.post("/recalculate/all")
-def recalculate_all_rankings():
+def recalculate_all_rankings(db: Session = Depends(get_db_session)):
     """
     ADMIN ENDPOINT: Recalculate rankings for ALL tournaments.
     Use this to rebuild the entire ranking system from scratch.
 
     WARNING: This may take a while for many tournaments.
     """
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-
     try:
-        # Get all tournaments
-        cur.execute("""
-            SELECT id, name 
-            FROM tournaments 
-            WHERE deleted_at IS NULL 
-            ORDER BY start_date ASC, id ASC
-        """)
+        r = db.execute(
+            text(
+                """
+                SELECT id, name 
+                FROM tournaments 
+                WHERE deleted_at IS NULL 
+                ORDER BY start_date ASC, id ASC
+                """
+            )
+        )
 
-        tournaments = cur.fetchall()
+        tournaments = [dict(row) for row in r.mappings().all()]
 
         if not tournaments:
             return {
@@ -588,9 +614,6 @@ def recalculate_all_rankings():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to recalculate rankings: {str(e)}",
         )
-    finally:
-        cur.close()
-        conn.close()
 
 
 # ============================================================================
@@ -600,51 +623,71 @@ def recalculate_all_rankings():
 
 @router.get("/top-players")
 def get_top_players(
-    category: Optional[str] = None, limit: int = Query(10, ge=1, le=50)
+    category: Optional[str] = None, limit: int = Query(10, ge=1, le=50), db: Session = Depends(get_db_session)
 ):
     """
     Get top players across all categories or specific category.
     Simplified endpoint for homepage/widgets.
     """
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-
     try:
         if category:
-            category_filter = "WHERE pr.category = %s"
-            params = [category.upper(), limit]
+            query = text(
+                """
+                SELECT 
+                    pr.current_rank as rank,
+                    pr.category,
+                    pr.total_points as points,
+                    CONCAT(p.first_name, ' ', p.last_name) as name,
+                    p.image_url,
+                    p.slug,
+                    c.name as club,
+                    c.logo_url as club_logo,
+                    CASE 
+                        WHEN pr.previous_rank IS NULL THEN 'same'
+                        WHEN pr.current_rank < pr.previous_rank THEN 'up'
+                        WHEN pr.current_rank > pr.previous_rank THEN 'down'
+                        ELSE 'same'
+                    END as change
+                FROM player_rankings pr
+                JOIN players p ON pr.player_id = p.id
+                LEFT JOIN clubs c ON p.club_id = c.id
+                WHERE pr.category = :category
+                ORDER BY pr.category, pr.current_rank
+                LIMIT :limit
+                """
+            )
+            params = {"category": category.upper(), "limit": limit}
         else:
-            category_filter = ""
-            params = [limit]
+            query = text(
+                """
+                SELECT 
+                    pr.current_rank as rank,
+                    pr.category,
+                    pr.total_points as points,
+                    CONCAT(p.first_name, ' ', p.last_name) as name,
+                    p.image_url,
+                    p.slug,
+                    c.name as club,
+                    c.logo_url as club_logo,
+                    CASE 
+                        WHEN pr.previous_rank IS NULL THEN 'same'
+                        WHEN pr.current_rank < pr.previous_rank THEN 'up'
+                        WHEN pr.current_rank > pr.previous_rank THEN 'down'
+                        ELSE 'same'
+                    END as change
+                FROM player_rankings pr
+                JOIN players p ON pr.player_id = p.id
+                LEFT JOIN clubs c ON p.club_id = c.id
+                ORDER BY pr.category, pr.current_rank
+                LIMIT :limit
+                """
+            )
+            params = {"limit": limit}
 
-        query = f"""
-            SELECT 
-                pr.current_rank as rank,
-                pr.category,
-                pr.total_points as points,
-                CONCAT(p.first_name, ' ', p.last_name) as name,
-                p.image_url,
-                p.slug,
-                c.name as club,
-                c.logo_url as club_logo,
-                CASE 
-                    WHEN pr.previous_rank IS NULL THEN 'same'
-                    WHEN pr.current_rank < pr.previous_rank THEN 'up'
-                    WHEN pr.current_rank > pr.previous_rank THEN 'down'
-                    ELSE 'same'
-                END as change
-            FROM player_rankings pr
-            JOIN players p ON pr.player_id = p.id
-            LEFT JOIN clubs c ON p.club_id = c.id
-            {category_filter}
-            ORDER BY pr.category, pr.current_rank
-            LIMIT %s
-        """
+        res = db.execute(query, params)
+        players = [dict(r) for r in res.mappings().all()]
 
-        cur.execute(query, params)
-        players = cur.fetchall()
-
-        return [dict(p) for p in players] if players else []
+        return players if players else []
 
     except Exception as e:
         logger.error(f"Error fetching top players: {e}")
@@ -652,6 +695,3 @@ def get_top_players(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch top players",
         )
-    finally:
-        cur.close()
-        conn.close()

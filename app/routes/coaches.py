@@ -13,7 +13,8 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List
 import logging
-from app.database import get_db
+from sqlalchemy.orm import Session
+from app.database import get_db_session
 from app.schemas import CoachWithClub, CoachList
 from app.services import coaches_service
 
@@ -22,7 +23,7 @@ router = APIRouter(prefix="/coaches", tags=["Coaches"])
 
 
 @router.get("", response_model=List[CoachList])
-def get_all_coaches(db=Depends(get_db)):
+def get_all_coaches(db: Session = Depends(get_db_session)):
     """
     Fetch all coaches for dashboard navbar dropdown.
     Returns minimal coach information sorted alphabetically by last name.
@@ -40,7 +41,7 @@ def get_all_coaches(db=Depends(get_db)):
 
 
 @router.get("/{slug}", response_model=CoachWithClub)
-def get_coach_by_slug(slug: str, db=Depends(get_db)):
+def get_coach_by_slug(slug: str, db: Session = Depends(get_db_session)):
     """
     Fetch detailed information for a specific coach by slug.
     Includes club information and certification details.
@@ -67,7 +68,7 @@ def get_coach_by_slug(slug: str, db=Depends(get_db)):
 
 
 @router.get("/{slug}/stats")
-def get_coach_stats(slug: str, db=Depends(get_db)):
+def get_coach_stats(slug: str, db: Session = Depends(get_db_session)):
     """
     Fetch statistics for a coach including tournament participation.
     """

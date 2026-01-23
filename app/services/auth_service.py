@@ -1,6 +1,6 @@
 """
 Services for Authentication operations
-All database queries for auth-related endpoints
+All database queries for auth-related endpoints (SQLAlchemy version)
 """
 
 # ============================================================================
@@ -13,104 +13,90 @@ All database queries for auth-related endpoints
 # Used by: /auth endpoints (login, register, password reset)
 
 import logging
-from psycopg2.extras import RealDictCursor
+from sqlalchemy.orm import Session
+from app.models import User
 
 logger = logging.getLogger(__name__)
 
 
-def get_user_by_email(db, email: str):
+def get_user_by_email(db: Session, email: str) -> dict | None:
     """
     Fetch user from database by email.
-    Returns: dict with id, email, password_hash, role
+    Returns: dict with id, email, password_hash, role (or None if not found)
     """
-    cur = db.cursor(cursor_factory=RealDictCursor)
-
     try:
-        cur.execute(
-            "SELECT id, email, password_hash, role FROM users WHERE email = %s",
-            (email,),
-        )
-        user = cur.fetchone()
-        return user
+        user = db.query(User).filter(User.email == email).first()
+        if user:
+            return user.to_dict()
+        return None
 
     except Exception as e:
         logger.error(f"Error fetching user by email: {e}")
         raise
-    finally:
-        cur.close()
 
 
-def check_email_exists(db, email: str) -> bool:
+def check_email_exists(db: Session, email: str) -> bool:
     """
     Check if email already exists in database.
     Returns: True if email exists, False otherwise
     """
-    cur = db.cursor(cursor_factory=RealDictCursor)
-
     try:
-        cur.execute("SELECT id FROM users WHERE email = %s", (email,))
-        result = cur.fetchone()
-        return result is not None
+        user = db.query(User).filter(User.email == email).first()
+        return user is not None
 
     except Exception as e:
         logger.error(f"Error checking email existence: {e}")
         raise
-    finally:
-        cur.close()
 
 
-def create_user(db, email: str, password_hash: str, role: str = "viewer"):
+def create_user(db: Session, email: str, password_hash: str, role: str = "viewer") -> dict:
     """
     Create new user in database.
     Returns: dict with id, email, role
     """
-    cur = db.cursor(cursor_factory=RealDictCursor)
-
     try:
-        cur.execute(
-            """
-            INSERT INTO users (email, password_hash, role)
-            VALUES (%s, %s, %s)
-            RETURNING id, email, role
-            """,
-            (email, password_hash, role),
+        user = User(
+            email=email,
+            password_hash=password_hash,
+            role=role,
         )
-
-        user = cur.fetchone()
+        db.add(user)
         db.commit()
-        return user
+        db.refresh(user)
+
+        return {
+            "id": user.id,
+            "email": user.email,
+            "role": user.role,
+        }
 
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating user: {e}")
         raise
-    finally:
-        cur.close()
 
 
-def update_user_password(db, email: str, password_hash: str):
+def update_user_password(db: Session, email: str, password_hash: str) -> dict | None:
     """
     Update password hash for a user by email.
-    Returns: dict with id, email, role
+    Returns: dict with id, email, role (or None if user not found)
     """
-    cur = db.cursor(cursor_factory=RealDictCursor)
-
     try:
-        cur.execute(
-            """
-            UPDATE users
-            SET password_hash = %s
-            WHERE email = %s
-            RETURNING id, email, role
-            """,
-            (password_hash, email),
-        )
-        user = cur.fetchone()
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            return None
+
+        user.password_hash = password_hash
         db.commit()
-        return user
+        db.refresh(user)
+
+        return {
+            "id": user.id,
+            "email": user.email,
+            "role": user.role,
+        }
+
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating user password: {e}")
         raise
-    finally:
-        cur.close()

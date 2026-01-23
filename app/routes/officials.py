@@ -10,7 +10,8 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List
 import logging
-from app.database import get_db
+from sqlalchemy.orm import Session
+from app.database import get_db_session
 from app.schemas import UmpireResponse, UmpireProfileWithStats, RefereeResponse
 from app.services import officials_service
 
@@ -21,7 +22,7 @@ router = APIRouter(prefix="/officials", tags=["Technical Officials"])
 
 
 @router.get("/umpires", response_model=List[UmpireResponse])
-def get_all_umpires(db=Depends(get_db)):
+def get_all_umpires(db: Session = Depends(get_db_session)):
     """Fetch all active umpires from the database."""
     try:
         umpires = officials_service.get_all_umpires(db)
@@ -36,7 +37,7 @@ def get_all_umpires(db=Depends(get_db)):
 
 
 @router.get("/umpires/{slug}", response_model=UmpireResponse)
-def get_umpire_by_slug(slug: str, db=Depends(get_db)):
+def get_umpire_by_slug(slug: str, db: Session = Depends(get_db_session)):
     """Fetch a single umpire profile by their unique slug."""
     try:
         umpire = officials_service.get_umpire_by_slug(db, slug)
@@ -58,7 +59,7 @@ def get_umpire_by_slug(slug: str, db=Depends(get_db)):
 
 
 @router.get("/umpires/{slug}/stats", response_model=UmpireProfileWithStats)
-def get_umpire_statistics(slug: str, db=Depends(get_db)):
+def get_umpire_statistics(slug: str, db: Session = Depends(get_db_session)):
     """
     Get full profile of an umpire including:
     - Personal Details
@@ -90,7 +91,7 @@ def get_umpire_statistics(slug: str, db=Depends(get_db)):
 
 
 @router.get("/referees", response_model=List[RefereeResponse])
-def get_all_referees(db=Depends(get_db)):
+def get_all_referees(db: Session = Depends(get_db_session)):
     """Fetch all active referees from the database."""
     try:
         referees = officials_service.get_all_referees(db)
@@ -105,7 +106,7 @@ def get_all_referees(db=Depends(get_db)):
 
 
 @router.get("/referees/{slug}", response_model=RefereeResponse)
-def get_referee_by_slug(slug: str, db=Depends(get_db)):
+def get_referee_by_slug(slug: str, db: Session = Depends(get_db_session)):
     """Fetch a single referee profile by their unique slug."""
     try:
         referee = officials_service.get_referee_by_slug(db, slug)

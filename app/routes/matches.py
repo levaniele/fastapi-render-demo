@@ -15,7 +15,8 @@
 
 from fastapi import APIRouter, HTTPException, status, Depends
 import logging
-from app.database import get_db
+from sqlalchemy.orm import Session
+from app.database import get_db_session
 from app.services import matches_service
 
 
@@ -29,7 +30,7 @@ router = APIRouter(prefix="/matches", tags=["Matches"])
 
 
 @router.get("/ties/{tie_id}")
-def get_match_tie_by_id(tie_id: int, db=Depends(get_db)):
+def get_match_tie_by_id(tie_id: int, db: Session = Depends(get_db_session)):
     """
     Fetch complete match tie details including all individual matches.
     """
@@ -60,7 +61,7 @@ def get_match_tie_by_id(tie_id: int, db=Depends(get_db)):
 
 
 @router.get("/individual/{match_id}")
-def get_individual_match(match_id: int, db=Depends(get_db)):
+def get_individual_match(match_id: int, db: Session = Depends(get_db_session)):
     """
     Fetch detailed information for a single individual match.
     Handles both singles and doubles matches.
@@ -87,7 +88,7 @@ def get_individual_match(match_id: int, db=Depends(get_db)):
 
 
 @router.get("/category/{category}")
-def get_matches_by_category(category: str, limit: int = 50, db=Depends(get_db)):
+def get_matches_by_category(category: str, limit: int = 50, db: Session = Depends(get_db_session)):
     """
     Fetch recent matches filtered by category.
     Category should be one of: MS, WS, MD, WD, XD
@@ -112,7 +113,7 @@ def get_matches_by_category(category: str, limit: int = 50, db=Depends(get_db)):
 
 
 @router.get("/recent")
-def get_recent_matches(limit: int = 20, db=Depends(get_db)):
+def get_recent_matches(limit: int = 20, db: Session = Depends(get_db_session)):
     """
     Fetch most recent matches across all tournaments.
     """
@@ -134,7 +135,7 @@ def get_recent_matches(limit: int = 20, db=Depends(get_db)):
 
 
 @router.get("/stats/player/{player_id}")
-def get_player_match_stats(player_id: int, db=Depends(get_db)):
+def get_player_match_stats(player_id: int, db: Session = Depends(get_db_session)):
     """
     Get match statistics for a specific player.
     Includes singles and doubles records.
@@ -161,7 +162,7 @@ def get_player_match_stats(player_id: int, db=Depends(get_db)):
 
 
 @router.get("/stats/head-to-head")
-def get_head_to_head_stats(player1_id: int, player2_id: int, db=Depends(get_db)):
+def get_head_to_head_stats(player1_id: int, player2_id: int, db: Session = Depends(get_db_session)):
     """
     Get head-to-head statistics between two players.
     """

@@ -13,7 +13,8 @@
 import logging
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List
-from app.database import get_db
+from sqlalchemy.orm import Session
+from app.database import get_db_session
 from app.schemas import ClubList
 from app.services import clubs_service
 
@@ -22,7 +23,7 @@ router = APIRouter(prefix="/clubs", tags=["Clubs"])
 
 
 @router.get("", response_model=List[ClubList])
-def get_all_clubs(db=Depends(get_db)):
+def get_all_clubs(db: Session = Depends(get_db_session)):
     """Fetch all clubs for dashboard and dropdown lists."""
     try:
         clubs = clubs_service.get_all_clubs(db)
@@ -37,7 +38,7 @@ def get_all_clubs(db=Depends(get_db)):
 
 
 @router.get("/{slug}")
-def get_club_by_slug(slug: str, db=Depends(get_db)):
+def get_club_by_slug(slug: str, db: Session = Depends(get_db_session)):
     """Fetch club details with head coach information."""
     try:
         club = clubs_service.get_club_by_slug(db, slug)
@@ -60,7 +61,7 @@ def get_club_by_slug(slug: str, db=Depends(get_db)):
 
 
 @router.get("/{slug}/players")
-def get_club_players(slug: str, db=Depends(get_db)):
+def get_club_players(slug: str, db: Session = Depends(get_db_session)):
     """Fetch all players belonging to a club with their rankings."""
     try:
         players = clubs_service.get_club_players(db, slug)
