@@ -134,9 +134,10 @@ def require_role(*allowed_roles: str):
     """
     def role_checker(current_user: dict = Depends(get_current_user)) -> dict:
         # User is already authenticated by the dependency injection
-        user_role = current_user.get("role", "viewer")
+        user_role = current_user.get("role", "viewer").lower()
+        allowed_roles_lower = [r.lower() for r in allowed_roles]
 
-        if user_role not in allowed_roles:
+        if user_role not in allowed_roles_lower:
             logger.warning(
                 f"Access denied: user {current_user.get('email')} with role '{user_role}' "
                 f"attempted to access resource requiring {allowed_roles}"
