@@ -16,6 +16,7 @@ from sqlalchemy import (
     String,
     Date,
     DateTime,
+    Time,
     Boolean,
     SmallInteger,
     Computed,
@@ -155,11 +156,11 @@ class TournamentTimeBlock(Base):
     block_type = Column(String(50), nullable=True)
     block_label = Column(String(100), nullable=True)
     block_date = Column(Date, nullable=False)
-    start_time = Column(String(10), nullable=False) # Stored as string in SQL?
-    end_time = Column(String(10), nullable=False)
+    start_time = Column(Time, nullable=False)
+    end_time = Column(Time, nullable=False)
     lunch_break_enabled = Column(Boolean, default=False)
-    break_start_time = Column(String(10), nullable=True)
-    break_end_time = Column(String(10), nullable=True)
+    break_start_time = Column(Time, nullable=True)
+    break_end_time = Column(Time, nullable=True)
 
     tournament = relationship("Tournament", back_populates="time_blocks")
 
