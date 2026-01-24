@@ -21,6 +21,7 @@ from sqlalchemy import (
     Computed,
     ForeignKey,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship, Session
 from app.database import Base
@@ -124,8 +125,8 @@ class TournamentEvent(Base):
     currency = Column(String(10), nullable=True)
     member_perks = Column(String(255), nullable=True) # Check type, inferred string
     draw_type = Column(String(50), nullable=True)
-    draw_setup = Column(String(255), nullable=True) # Check type
-    generation_rules = Column(String(255), nullable=True) # Check type
+    draw_setup = Column(JSONB, nullable=True)
+    generation_rules = Column(JSONB, nullable=True)
     seeding_mode = Column(String(50), nullable=True)
     lock_entries = Column(Boolean, default=False)
     publish_bracket_preview = Column(Boolean, default=False)
