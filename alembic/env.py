@@ -78,7 +78,10 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
 
-    with connectable.connect() as connection:
+    # Schema inspection starts an implicit SQLAlchemy transaction. Manage that
+    # transaction explicitly so migrations and revision stamps are committed
+    # when the connection scope exits.
+    with connectable.begin() as connection:
         # Reflect missing tables into metadata so Alembic knows about them (fixes foreign key errors)
         from sqlalchemy import inspect
         inspector = inspect(connection)
