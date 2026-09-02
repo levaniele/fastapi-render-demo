@@ -33,7 +33,7 @@ SECRET_KEY=<generate-strong-key>  # Use: python -c "import secrets; print(secret
 ALLOWED_ORIGINS=https://yourdomain.com
 DOCS_ENABLED=false
 DOCS_IN_PRODUCTION=false
-OBSERVABILITY_ENABLED=true
+OBSERVABILITY_ENABLED=false
 OBSERVABILITY_URL=<your-go-service-url>
 ```
 

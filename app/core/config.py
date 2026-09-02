@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     docs_in_production: bool = Field(default=False, alias="DOCS_IN_PRODUCTION")
     
     # Observability settings
-    observability_enabled: bool = Field(default=True, alias="OBSERVABILITY_ENABLED")
+    observability_enabled: bool = Field(default=False, alias="OBSERVABILITY_ENABLED")
     observability_url: str = Field(
         default="http://localhost:8080",
         alias="OBSERVABILITY_URL"
