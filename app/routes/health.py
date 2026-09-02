@@ -5,6 +5,7 @@ Checks database, backend, and observability service connectivity.
 
 import httpx
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -88,6 +89,19 @@ async def health_check(db: Session = Depends(get_db_session)):
 def simple_health():
     """Simple health check that just returns OK if the server is running."""
     return {"status": "ok"}
+
+
+@router.get("/db/health")
+def database_health(db: Session = Depends(get_db_session)):
+    """Check that the API can execute a query against PostgreSQL."""
+    try:
+        db.execute(text("SELECT 1")).fetchone()
+        return {"ok": True, "database": "ok"}
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "database": "error"},
+            status_code=503,
+        )
 
 
 @router.get("/health/cache")
