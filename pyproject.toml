@@ -1,0 +1,45 @@
+[tool.pytest.ini_options]
+# Pytest configuration
+
+# Test discovery patterns
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+# Test paths
+testpaths = ["tests"]
+
+# Markers
+markers = [
+    "unit: Unit tests (fast, isolated)",
+    "integration: Integration tests (with database)",
+    "e2e: End-to-end tests (full workflows)",
+    "slow: Slow running tests",
+]
+
+# Output options
+addopts = [
+    "-v",                          # Verbose output
+    "--strict-markers",            # Strict marker validation
+    "--tb=short",                  # Short traceback format
+    "--disable-warnings",          # Disable warnings
+    "-ra",                         # Show summary of all test outcomes
+]
+
+# Coverage options (when using --cov)
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "*/tests/*",
+    "*/venv/*",
+    "*/__pycache__/*",
+    "*/alembic/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+
+[tool.coverage.html]
+directory = "htmlcov"

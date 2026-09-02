@@ -1,0 +1,49 @@
+# ============================================================================
+# Production Dependencies - Your Installed Versions
+# ============================================================================
+# Generated: 2026-01-30
+# Python: 3.11+
+# Platform: Render (or any cloud platform)
+
+# Web Framework
+fastapi==0.118.0
+pydantic==2.12.0
+pydantic-settings==2.12.0
+pydantic_core==2.41.1
+
+# ASGI Server (Production)
+gunicorn==21.2.0
+uvicorn==0.37.0
+
+# Database
+psycopg2-binary==2.9.10
+SQLAlchemy==2.0.45
+alembic==1.18.1
+
+# Authentication
+PyJWT==2.10.1
+passlib==1.7.4
+bcrypt==3.2.2
+
+# Utilities
+python-dotenv==1.2.1
+email-validator==2.3.0
+
+# HTTP Client (for observability)
+httpx==0.24.1
+
+# System metrics collection
+psutil==5.9.5
+
+# Caching
+cachetools==5.3.2
+
+# ============================================================================
+# Development Dependencies (Optional - install separately)
+# ============================================================================
+# pytest==7.4.4
+# pytest-asyncio==0.21.1
+# pytest-cov==4.1.0
+# black==24.1.1
+# ruff==0.1.14
+# mypy==1.8.0
